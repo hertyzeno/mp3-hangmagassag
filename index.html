@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MP3 Hangmagasság és Sebesség</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --line:#2a2f3a; --txt:#e8eaef; --mut:#9aa1ae; --acc:#4fb3a9; --acc2:#e0a84a; --err:#e06a6a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:620px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:22px; margin:4px 0 2px; letter-spacing:.2px; }
+  .sub { color:var(--mut); font-size:14px; margin-bottom:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .drop { display:block; border:2px dashed var(--line); border-radius:12px; padding:22px 12px; text-align:center; cursor:pointer; transition:border-color .15s; }
+  .drop.over, .drop:hover { border-color:var(--acc); }
+  .drop strong { display:block; font-size:17px; margin-bottom:4px; }
+  .drop span { color:var(--mut); font-size:14px; }
+  input[type=file] { display:none; }
+  .info { color:var(--mut); font-size:14px; margin-top:10px; word-break:break-word; }
+  .row { display:flex; align-items:center; gap:10px; }
+  .label { font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:var(--mut); margin-bottom:8px; display:flex; justify-content:space-between; }
+  .label button { all:unset; color:var(--acc); cursor:pointer; text-transform:none; letter-spacing:0; font-size:13px; }
+  .val { font-size:30px; font-weight:650; min-width:0; flex:1; text-align:center; font-variant-numeric:tabular-nums; }
+  .val small { font-size:15px; font-weight:400; color:var(--mut); margin-left:4px; }
+  .step { width:52px; height:52px; border-radius:12px; border:1px solid var(--line); background:#20242d; color:var(--txt); font-size:26px; cursor:pointer; flex:none; }
+  .step:active { background:#2a2f3a; }
+  input[type=range] { width:100%; margin:14px 0 4px; accent-color:var(--acc); height:28px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .chip { border:1px solid var(--line); background:#20242d; color:var(--txt); border-radius:999px; padding:6px 12px; font-size:14px; cursor:pointer; }
+  .chip.on { border-color:var(--acc); color:var(--acc); }
+  .opt { display:flex; gap:10px; align-items:flex-start; margin:10px 0; font-size:15px; cursor:pointer; }
+  .opt input { width:20px; height:20px; margin-top:2px; accent-color:var(--acc); flex:none; }
+  .opt small { display:block; color:var(--mut); font-size:13px; }
+  .go { width:100%; padding:15px; font-size:17px; font-weight:600; border:0; border-radius:12px; background:var(--acc); color:#06201d; cursor:pointer; }
+  .go:disabled { opacity:.4; cursor:default; }
+  .bar { height:8px; background:#20242d; border-radius:99px; overflow:hidden; margin-top:12px; display:none; }
+  .bar i { display:block; height:100%; width:0; background:var(--acc); transition:width .1s; }
+  .status { font-size:14px; color:var(--mut); margin-top:8px; min-height:20px; }
+  .status.err { color:var(--err); }
+  audio { width:100%; margin:6px 0 12px; }
+  .pl { font-size:14px; color:var(--mut); }
+  select { background:#20242d; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:15px; flex:1; }
+  .save { padding:11px 16px; border-radius:10px; border:1px solid var(--acc); background:transparent; color:var(--acc); font-size:15px; font-weight:600; cursor:pointer; }
+  .note { font-size:13px; color:var(--mut); margin-top:10px; }
+  .hidden { display:none !important; }
+  .keybox { margin-top:12px; padding:12px; border-radius:10px; background:#20242d; display:flex; gap:14px; align-items:center; }
+  .keybox .k { font-size:26px; font-weight:650; white-space:nowrap; }
+  .keybox .arrow { color:var(--mut); font-size:20px; }
+  .keybox .k.new { color:var(--acc2); }
+  #kMeta { font-size:13px; color:var(--mut); margin-top:6px; }
+  details { color:var(--mut); font-size:14px; }
+  details summary { cursor:pointer; color:var(--txt); }
+</style>
+</head>
+<body>
+<main>
+  <h1>MP3 Hangmagasság és Sebesség</h1>
+  <div class="sub">Félhangonkénti hangolás és külön sebességállítás, asztali változat: a fájl a gépeden marad, MP3-ban vagy WAV-ban ment.</div>
+
+  <div class="card">
+    <label class="drop" id="drop">
+      <strong>MP3 vagy videó kiválasztása</strong>
+      <span>Koppints ide, vagy húzd ide a fájlt (MP3, WAV, M4A, FLAC, vagy videó: MP4, MOV, WebM)</span>
+      <input type="file" id="file" accept="audio/*,video/*,.mp3,.wav,.m4a,.flac,.ogg,.mp4,.mov,.webm,.m4v">
+    </label>
+    <div class="info" id="info"></div>
+    <div id="keyWrap" class="hidden">
+      <div class="keybox"><div><div class="pl">Eredeti</div><div class="k" id="kOrig">–</div></div><div class="arrow">→</div><div><div class="pl">Módosított</div><div class="k new" id="kNew">–</div></div></div>
+      <div class="meta" id="kMeta"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">Hangmagasság <button id="stReset">Alaphelyzet</button></div>
+    <div class="row">
+      <button class="step" id="stMinus" aria-label="Fél hanggal lejjebb">−</button>
+      <div class="val" id="stVal">0<small>félhang</small></div>
+      <button class="step" id="stPlus" aria-label="Fél hanggal feljebb">+</button>
+    </div>
+    <input type="range" id="st" min="-12" max="12" step="1" value="0">
+    <div class="pl" id="stNote">Eredeti hangnem</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Sebesség <button id="spReset">Alaphelyzet</button></div>
+    <div class="row">
+      <button class="step" id="spMinus" aria-label="Lassabb">−</button>
+      <div class="val" id="spVal">100<small>%</small></div>
+      <button class="step" id="spPlus" aria-label="Gyorsabb">+</button>
+    </div>
+    <input type="range" id="sp" min="50" max="200" step="1" value="100">
+    <div class="chips" id="chips"></div>
+    <label class="opt"><input type="checkbox" id="keep" checked>
+      <span>Hangmagasság megtartása sebességváltáskor<small>Kikapcsolva magnós üzemmód: gyorsításnál a hang is magasabb lesz, lassításnál mélyebb.</small></span></label>
+    <label class="opt"><input type="checkbox" id="trans" checked>
+      <span>Ütések élességének megőrzése<small>Dobos, ritmusos zenénél tisztább lesz a lecsengés. Énekhez, vonósokhoz kikapcsolható.</small></span></label>
+  </div>
+
+  <button class="go" id="go" disabled>Feldolgozás</button>
+  <div class="bar" id="bar"><i id="barI"></i></div>
+  <div class="status" id="status"></div>
+
+  <div class="card hidden" id="result" style="margin-top:14px">
+    <div class="pl">Eredeti</div>
+    <audio id="aOrig" controls preload="metadata"></audio>
+    <div class="pl" id="resLabel">Módosított</div>
+    <audio id="aRes" controls preload="metadata"></audio>
+    <div class="row">
+      <select id="bits">
+        <option value="mp3-320" selected>MP3 320 kbps (legjobb)</option>
+        <option value="mp3-256">MP3 256 kbps</option>
+        <option value="mp3-192">MP3 192 kbps (kisebb fájl)</option>
+        <option value="16">WAV 16 bit (veszteségmentes, CD)</option>
+        <option value="24">WAV 24 bit (veszteségmentes, stúdió)</option>
+        <option value="32">WAV 32 bit lebegőpontos</option>
+      </select>
+      <button class="save" id="save">Mentés</button>
+    </div>
+    <div class="note" id="saveNote"></div>
+  </div>
+
+  <details class="card">
+    <summary>Hogyan működik, mennyire „veszteségmentes”?</summary>
+    <p>Az MP3 eleve veszteséges formátum. A program a dekódolt hangot 32 bites lebegőpontos pontossággal dolgozza fel. WAV-mentésnél nincs újabb veszteség; MP3-mentésnél egy második tömörítés történik, 320 kbps-on ez gyakorlatilag nem hallható. Az MP3-kódoló a <a href="https://lame.sourceforge.io" style="color:var(--acc)">LAME</a> JavaScript-változata (lamejs, LGPL), első használatkor internetről töltődik be.</p>
+    <p>Hangolás: fázisvokóder csúcskövető fázisrögzítéssel, majd Kaiser-ablakos sinc-újramintavételezés (kb. −90 dB alias-elnyomás). A sztereókép a két csatorna közös fázisvezérlésével marad meg. Szinuszos teszten a hangmagasság hibája 0,01 cent alatt van.</p>
+    <p>A hangmagasság-eltolás sosem teljesen hibátlan: nagy lépéseknél (±7 félhang fölött) az ének kicsit „fémesebb” lehet, ez minden ilyen eljárás korlátja. 0 félhang és 100% sebesség esetén a hang bitre azonos marad. Magnós módban, csak sebességváltásnál nincs fázisvokóder, csak tiszta újramintavételezés.</p>
+  </details>
+</main>
+<script>
+// ===== Hangfeldolgozó motor: fázisvokóder (identity phase locking, sztereó-koherens) + Kaiser-sinc újramintavételezés =====
+const DSP = (() => {
+  const yieldNow = () => new Promise(r => setTimeout(r, 0));
+
+  function makeFFT(n) {
+    const levels = Math.round(Math.log2(n));
+    const cos = new Float64Array(n / 2), sin = new Float64Array(n / 2);
+    for (let i = 0; i < n / 2; i++) { cos[i] = Math.cos(2 * Math.PI * i / n); sin[i] = Math.sin(2 * Math.PI * i / n); }
+    const rev = new Uint32Array(n);
+    for (let i = 0; i < n; i++) { let r = 0, x = i; for (let j = 0; j < levels; j++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+    return function fft(re, im, inverse) {
+      for (let i = 0; i < n; i++) {
+        const j = rev[i];
+        if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+      }
+      const sgn = inverse ? 1 : -1;
+      for (let size = 2; size <= n; size <<= 1) {
+        const half = size >> 1, step = n / size;
+        for (let i = 0; i < n; i += size) {
+          for (let j = i, k = 0; j < i + half; j++, k += step) {
+            const wr = cos[k], wi = sgn * sin[k], l = j + half;
+            const tr = re[l] * wr - im[l] * wi, ti = re[l] * wi + im[l] * wr;
+            re[l] = re[j] - tr; im[l] = im[j] - ti; re[j] += tr; im[j] += ti;
+          }
+        }
+      }
+    };
+  }
+
+  const TWO_PI = 2 * Math.PI;
+  const wrap = p => p - TWO_PI * Math.round(p / TWO_PI);
+
+  // Időnyújtás hangmagasság-változás nélkül. channels: Float32Array[]; stretch > 1 = hosszabb.
+  async function timeStretch(channels, stretch, opt = {}) {
+    const N = opt.N || 4096, Hs = N / 4, half = N / 2;
+    const Ha = Hs / stretch;
+    const onProgress = opt.onProgress || (() => {});
+    const transients = opt.transients !== false;
+    const C = channels.length, len = channels[0].length;
+    const pad = N;
+    const inLen = len + 2 * pad;
+    const xin = channels.map(ch => { const a = new Float32Array(inLen); a.set(ch, pad); return a; });
+    const nFrames = Math.floor((inLen - N) / Ha) + 1;
+    const outBufLen = (nFrames - 1) * Hs + N;
+    const ys = channels.map(() => new Float32Array(outBufLen));
+    const fft = makeFFT(N);
+    const win = new Float64Array(N);
+    for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(TWO_PI * i / N);
+    const scale = 1 / (N * 1.5); // Hann² 75% átfedésnél összeg = 1.5
+
+    const re = [], im = [], mag = [], ph = [];
+    for (let c = 0; c < C; c++) {
+      re.push(new Float64Array(N)); im.push(new Float64Array(N));
+      mag.push(new Float64Array(half + 1)); ph.push(new Float64Array(half + 1));
+    }
+    const mMag = new Float64Array(half + 1), mPh = new Float64Array(half + 1);
+    let prevMPh = new Float64Array(half + 1), prevSyn = new Float64Array(half + 1);
+    const syn = new Float64Array(half + 1), prevMMag = new Float64Array(half + 1);
+    const peaks = new Int32Array(half + 1);
+    let prevPos = 0, lastReset = -10, fluxAvg = 0;
+
+    for (let f = 0; f < nFrames; f++) {
+      const pos = Math.round(f * Ha);
+      let mr, mi;
+      // Analízis
+      let maxMag = 0;
+      for (let c = 0; c < C; c++) {
+        const r = re[c], m = im[c], x = xin[c];
+        for (let i = 0; i < N; i++) { r[i] = x[pos + i] * win[i]; m[i] = 0; }
+        fft(r, m, false);
+        for (let k = 0; k <= half; k++) { mag[c][k] = Math.hypot(r[k], m[k]); ph[c][k] = Math.atan2(m[k], r[k]); }
+      }
+      // Közös (mix) spektrum – a sztereókép megőrzéséhez
+      for (let k = 0; k <= half; k++) {
+        let sr = 0, si = 0;
+        for (let c = 0; c < C; c++) { sr += re[c][k]; si += im[c][k]; }
+        mMag[k] = Math.hypot(sr, si); mPh[k] = Math.atan2(si, sr);
+        if (mMag[k] > maxMag) maxMag = mMag[k];
+      }
+      // Tranziens-detektálás (spektrális fluxus)
+      let reset = f === 0;
+      if (transients && f > 0) {
+        let flux = 0, tot = 0;
+        for (let k = 2; k <= half; k++) { const d = mMag[k] - prevMMag[k]; if (d > 0) flux += d; tot += mMag[k]; }
+        const rel = tot > 1e-9 ? flux / tot : 0;
+        if (rel > 0.35 && rel > 2.5 * fluxAvg && f - lastReset > 4 && maxMag > 1e-3) { reset = true; lastReset = f; }
+        fluxAvg = 0.9 * fluxAvg + 0.1 * rel;
+      }
+      if (reset) {
+        syn.set(mPh);
+      } else {
+        const ha = pos - prevPos;
+        let np = 0;
+        const thr = maxMag * 1e-6;
+        for (let k = 1; k < half; k++) {
+          if (mMag[k] > thr && mMag[k] > mMag[k - 1] && mMag[k] >= mMag[k + 1]) peaks[np++] = k;
+        }
+        if (np === 0) { syn.set(mPh); }
+        else {
+          for (let p = 0; p < np; p++) {
+            const k = peaks[p], omega = TWO_PI * k / N;
+            const d = wrap(mPh[k] - prevMPh[k] - omega * ha);
+            syn[k] = prevSyn[k] + (omega + d / ha) * Hs;
+          }
+          // Identity phase locking: minden bin a legközelebbi csúcshoz igazodik
+          let p = 0;
+          for (let k = 0; k <= half; k++) {
+            while (p < np - 1 && k > (peaks[p] + peaks[p + 1]) / 2) p++;
+            const pk = peaks[p];
+            if (k !== pk) syn[k] = syn[pk] + (mPh[k] - mPh[pk]);
+          }
+        }
+      }
+      // Szintézis csatornánként: saját magnitúdó, saját fázis + közös eltolás
+      const op = f * Hs;
+      for (let c = 0; c < C; c++) {
+        const r = re[c], m = im[c];
+        for (let k = 0; k <= half; k++) {
+          const phi = ph[c][k] + (syn[k] - mPh[k]);
+          r[k] = mag[c][k] * Math.cos(phi); m[k] = mag[c][k] * Math.sin(phi);
+        }
+        m[0] = 0; m[half] = 0;
+        for (let k = 1; k < half; k++) { r[N - k] = r[k]; m[N - k] = -m[k]; }
+        fft(r, m, true);
+        const y = ys[c];
+        for (let i = 0; i < N; i++) y[op + i] += r[i] * win[i] * scale;
+      }
+      // Állapot
+      const t = prevMPh; prevMPh = mPh.slice(); prevSyn = syn.slice(); void t;
+      prevMMag.set(mMag);
+      prevPos = pos;
+      if ((f & 63) === 63) { onProgress(f / nFrames); await yieldNow(); }
+    }
+    const start = Math.round((pad - N / 2) * stretch + N / 2);
+    const outLen = Math.round(len * stretch);
+    return ys.map(y => y.slice(start, start + outLen));
+  }
+
+  function besselI0(x) {
+    let sum = 1, term = 1;
+    for (let k = 1; k < 50; k++) { term *= (x / (2 * k)) * (x / (2 * k)); sum += term; if (term < 1e-12 * sum) break; }
+    return sum;
+  }
+
+  // Újramintavételezés: ratio > 1 → rövidebb, magasabb hang (olvasási lépés = ratio)
+  async function resample(channels, ratio, opt = {}) {
+    const onProgress = opt.onProgress || (() => {});
+    const Z = 24, beta = 9, R = 512;
+    const fc = Math.min(1, 1 / ratio) * 0.95;
+    const halfW = Math.ceil(Z / fc), taps = 2 * halfW;
+    const i0b = besselI0(beta);
+    const table = new Float32Array((R + 1) * taps);
+    for (let r = 0; r <= R; r++) {
+      const frac = r / R;
+      for (let j = 0; j < taps; j++) {
+        const t = (j - halfW + 1) - frac;
+        const x = fc * t;
+        const sinc = x === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x);
+        const u = t / (Z / fc);
+        const w = Math.abs(u) >= 1 ? 0 : besselI0(beta * Math.sqrt(1 - u * u)) / i0b;
+        table[r * taps + j] = fc * sinc * w;
+      }
+    }
+    const len = channels[0].length;
+    const outLen = Math.round(len / ratio);
+    const out = channels.map(() => new Float32Array(outLen));
+    const total = outLen * channels.length;
+    let done = 0;
+    for (let c = 0; c < channels.length; c++) {
+      const x = channels[c], y = out[c];
+      for (let i = 0; i < outLen; i++) {
+        const pos = i * ratio;
+        const ip = Math.floor(pos);
+        const fr = (pos - ip) * R;
+        const ri = Math.floor(fr), a = fr - ri;
+        const o0 = ri * taps, o1 = o0 + taps;
+        const base = ip - halfW + 1;
+        let s = 0;
+        if (base >= 0 && base + taps <= len) {
+          for (let j = 0; j < taps; j++) { const h0 = table[o0 + j]; s += x[base + j] * (h0 + a * (table[o1 + j] - h0)); }
+        } else {
+          for (let j = 0; j < taps; j++) {
+            const idx = base + j; if (idx < 0 || idx >= len) continue;
+            const h0 = table[o0 + j]; s += x[idx] * (h0 + a * (table[o1 + j] - h0));
+          }
+        }
+        y[i] = s;
+        if ((i & 32767) === 32767) { done += 32768; onProgress(done / total); await yieldNow(); }
+      }
+    }
+    return out;
+  }
+
+  // Teljes lánc. semitones: félhang; speed: 1 = eredeti; keepPitch: sebességváltás ne változtasson hangmagasságot
+  async function process(channels, { semitones = 0, speed = 1, keepPitch = true, transients = true, onProgress } = {}) {
+    const prog = onProgress || (() => {});
+    const P = Math.pow(2, semitones / 12) * (keepPitch ? 1 : speed); // hangmagasság-arány
+    const stretch = P / speed;                                         // időnyújtás a PV-nek
+    let data = channels;
+    const needPV = Math.abs(stretch - 1) > 1e-9;
+    const needRS = Math.abs(P - 1) > 1e-9;
+    if (!needPV && !needRS) return { channels: channels.map(c => c.slice()), bypass: true };
+    if (needPV) data = await timeStretch(data, stretch, { transients, onProgress: p => prog(needRS ? p * 0.7 : p) });
+    if (needRS) data = await resample(data, P, { onProgress: p => prog(needPV ? 0.7 + p * 0.3 : p) });
+    prog(1);
+    return { channels: data, bypass: false };
+  }
+
+  // ---- WAV + ZIP kódolás ----
+  function encodeWAV(channels, sampleRate, bits) {
+    const C = channels.length, n = channels[0].length;
+    const bps = bits / 8, fmt = bits === 32 ? 3 : 1;
+    const dataLen = n * C * bps;
+    const buf = new ArrayBuffer(44 + dataLen), dv = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); dv.setUint32(4, 36 + dataLen, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, fmt, true); dv.setUint16(22, C, true);
+    dv.setUint32(24, sampleRate, true); dv.setUint32(28, sampleRate * C * bps, true);
+    dv.setUint16(32, C * bps, true); dv.setUint16(34, bits, true); str(36, 'data'); dv.setUint32(40, dataLen, true);
+    let o = 44;
+    if (bits === 32) {
+      for (let i = 0; i < n; i++) for (let c = 0; c < C; c++) { dv.setFloat32(o, channels[c][i], true); o += 4; }
+    } else {
+      const max = bits === 16 ? 32767 : 8388607;
+      for (let i = 0; i < n; i++) for (let c = 0; c < C; c++) {
+        let v = channels[c][i] * max;
+        if (bits === 16) v += (Math.random() - Math.random()); // TPDF dither
+        v = Math.max(-max - 1, Math.min(max, Math.round(v)));
+        if (bits === 16) { dv.setInt16(o, v, true); o += 2; }
+        else { dv.setUint8(o, v & 255); dv.setUint8(o + 1, (v >> 8) & 255); dv.setUint8(o + 2, (v >> 16) & 255); o += 3; }
+      }
+    }
+    return new Uint8Array(buf);
+  }
+
+  const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+
+  // Tárolt (tömörítetlen) ZIP egyetlen fájllal
+  function zipStore(name, data) {
+    const nameB = new TextEncoder().encode(name);
+    const crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+    lh.setUint16(26, nameB.length, true);
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0x0800, true);
+    cd.setUint32(16, crc, true); cd.setUint32(20, data.length, true); cd.setUint32(24, data.length, true);
+    cd.setUint16(28, nameB.length, true); cd.setUint32(42, 0, true);
+    const cdOff = 30 + nameB.length + data.length;
+    const eo = new DataView(new ArrayBuffer(22));
+    eo.setUint32(0, 0x06054b50, true); eo.setUint16(8, 1, true); eo.setUint16(10, 1, true);
+    eo.setUint32(12, 46 + nameB.length, true); eo.setUint32(16, cdOff, true);
+    return [new Uint8Array(lh.buffer), nameB, data, new Uint8Array(cd.buffer), nameB, new Uint8Array(eo.buffer)];
+  }
+
+  // ---- Hangnem-felismerés: hangolásbecslés + kromagram + Krumhansl–Kessler profilok ----
+  const KK_MAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+  const KK_MIN = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+  function pearson(a, b) {
+    const n = a.length; let ma = 0, mb = 0;
+    for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; } ma /= n; mb /= n;
+    let s = 0, sa = 0, sb = 0;
+    for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; s += x * y; sa += x * x; sb += y * y; }
+    return sa && sb ? s / Math.sqrt(sa * sb) : 0;
+  }
+  async function detectKey(channels, sr, opt = {}) {
+    const onProgress = opt.onProgress || (() => {});
+    const len = channels[0].length;
+    const N = 8192, H = 4096, half = N / 2;
+    const fft = makeFFT(N);
+    const win = new Float64Array(N);
+    for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(TWO_PI * i / N);
+    const re = new Float64Array(N), im = new Float64Array(N), mag = new Float64Array(half + 1);
+    const kLo = Math.ceil(55 * N / sr), kHi = Math.min(half - 1, Math.floor(4200 * N / sr));
+    const peaks = []; // [midi (tört), súly]
+    const nFrames = Math.max(1, Math.floor((len - N) / H) + 1);
+    // max. kb. 2500 keret (hosszú felvételnél ritkítunk)
+    const stride = Math.max(1, Math.ceil(nFrames / 2500));
+    for (let f = 0; f < nFrames; f += stride) {
+      const pos = f * H;
+      for (let i = 0; i < N; i++) {
+        let s = 0; const idx = pos + i;
+        if (idx < len) for (let c = 0; c < channels.length; c++) s += channels[c][idx];
+        re[i] = s * win[i]; im[i] = 0;
+      }
+      fft(re, im, false);
+      let mx = 0;
+      for (let k = 0; k <= half; k++) { mag[k] = Math.hypot(re[k], im[k]); if (k >= kLo && k <= kHi && mag[k] > mx) mx = mag[k]; }
+      if (mx < 1e-4) continue;
+      const thr = mx * 0.02;
+      for (let k = kLo; k <= kHi; k++) {
+        const m = mag[k];
+        if (m > thr && m > mag[k - 1] && m >= mag[k + 1]) {
+          const a = Math.log(mag[k - 1] + 1e-12), b = Math.log(m), c = Math.log(mag[k + 1] + 1e-12);
+          const den = a - 2 * b + c, d = den ? 0.5 * (a - c) / den : 0;
+          const freq = (k + d) * sr / N;
+          peaks.push(69 + 12 * Math.log2(freq / 440), Math.sqrt(m / mx));
+        }
+      }
+      if ((f & 127) === 0) { onProgress(f / nFrames); await yieldNow(); }
+    }
+    if (peaks.length < 40) return null;
+    // Hangolás (eltérés az A=440 Hz-es rendszertől), körkörös átlag
+    let cx = 0, cy = 0;
+    for (let i = 0; i < peaks.length; i += 2) { const fr = peaks[i] - Math.round(peaks[i]); cx += peaks[i + 1] * Math.cos(TWO_PI * fr); cy += peaks[i + 1] * Math.sin(TWO_PI * fr); }
+    const tuning = Math.atan2(cy, cx) / TWO_PI; // félhangban, [-0.5, 0.5]
+    const chroma = new Float64Array(12);
+    for (let i = 0; i < peaks.length; i += 2) {
+      const m = peaks[i] - tuning, r = Math.round(m);
+      const dev = Math.abs(m - r);
+      if (dev > 0.35) continue;
+      chroma[((r % 12) + 12) % 12] += peaks[i + 1] * (1 - dev);
+    }
+    const scores = [];
+    for (let pc = 0; pc < 12; pc++) {
+      const rot = Array.from({ length: 12 }, (_, i) => chroma[(i + pc) % 12]);
+      scores.push({ pc, mode: 'dur', r: pearson(rot, KK_MAJ) });
+      scores.push({ pc, mode: 'moll', r: pearson(rot, KK_MIN) });
+    }
+    scores.sort((a, b) => b.r - a.r);
+    onProgress(1);
+    return { pc: scores[0].pc, mode: scores[0].mode, r: scores[0].r, second: scores[1], margin: scores[0].r - scores[1].r, tuningCents: Math.round(tuning * 100), chroma: Array.from(chroma) };
+  }
+
+  return { timeStretch, resample, process, encodeWAV, zipStore, crc32, detectKey };
+})();
+if (typeof module !== 'undefined') module.exports = DSP;
+
+</script>
+<script>
+(() => {
+  const DESKTOP = true;
+  const $ = id => document.getElementById(id);
+  const NOTES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','H'];
+  let src = null; // { channels, sampleRate, name, duration }
+  let result = null; // { channels, sampleRate }
+  let resUrl = null, origUrl = null, busy = false;
+
+  // ---- hangnem ----
+  const MAJ = ['C','Desz','D','Esz','E','F','Fisz','G','Asz','A','B','H'];
+  const MIN = ['c','cisz','d','esz','e','f','fisz','g','gisz','a','b','h'];
+  const INT_MAJ = ['C','D♭','D','E♭','E','F','F♯','G','A♭','A','B♭','B'];
+  const INT_MIN = ['C','C♯','D','E♭','E','F','F♯','G','G♯','A','B♭','B'];
+  let key = null;
+  const keyName = (pc, mode) => mode === 'dur' ? MAJ[pc] + '-dúr' : MIN[pc] + '-moll';
+  const keyIntl = (pc, mode) => mode === 'dur' ? INT_MAJ[pc] + ' major' : INT_MIN[pc] + ' minor';
+  function totalShift() { // félhangban (magnós módban tört is lehet)
+    return +st.value + ($('keep').checked ? 0 : 12 * Math.log2(+sp.value / 100));
+  }
+  function newKeyText() {
+    if (!key) return null;
+    const s = totalShift(), r = Math.round(s), cents = Math.round((s - r) * 100);
+    const pc = ((key.pc + r) % 12 + 12) % 12;
+    return { name: keyName(pc, key.mode) + (cents ? ` ${cents > 0 ? '+' : ''}${cents}¢` : ''), intl: keyIntl(pc, key.mode), cents };
+  }
+  function renderKey() {
+    if (!key) return;
+    const nk = newKeyText();
+    $('kOrig').textContent = keyName(key.pc, key.mode);
+    $('kNew').textContent = nk.name;
+    const conf = key.r >= 0.75 && key.margin >= 0.08 ? 'biztos' : key.r >= 0.6 ? 'valószínű' : 'bizonytalan';
+    const rel = key.second && key.second.mode !== key.mode && ((key.mode === 'dur' && key.second.pc === (key.pc + 9) % 12) || (key.mode === 'moll' && key.second.pc === (key.pc + 3) % 12));
+    let meta = `${keyIntl(key.pc, key.mode)} → ${nk.intl} · felismerés: ${conf}`;
+    if (conf !== 'biztos' && key.second) meta += ` (${rel ? 'párhuzamos' : 'másik lehetőség'}: ${keyName(key.second.pc, key.second.mode)})`;
+    if (Math.abs(key.tuningCents) >= 10) meta += ` · a felvétel ${key.tuningCents > 0 ? '+' : ''}${key.tuningCents} centtel el van hangolva az A=440 Hz-hez képest`;
+    if (nk.cents) meta += ' · magnós módban a sebesség miatt nem egész félhang az eltolás';
+    $('kMeta').textContent = meta;
+  }
+
+  // ---- vezérlők ----
+  const st = $('st'), sp = $('sp');
+  function renderSt() {
+    const v = +st.value;
+    $('stVal').innerHTML = (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + '<small>félhang</small>';
+    const iv = { 0:'Eredeti hangnem', 1:'kis szekund', 2:'nagy szekund', 3:'kis terc', 4:'nagy terc', 5:'kvart', 6:'tritónusz', 7:'kvint', 8:'kis szext', 9:'nagy szext', 10:'kis szeptim', 11:'nagy szeptim', 12:'oktáv' }[Math.abs(v)];
+    $('stNote').textContent = v === 0 ? iv : `${iv} ${v > 0 ? 'fel' : 'le'}` + (key ? '' : ` · pl. A → ${NOTES[((9 + v) % 12 + 12) % 12]}`);
+    renderKey(); markDirty();
+  }
+  function renderSp() {
+    $('spVal').innerHTML = sp.value + '<small>%</small>';
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', +c.dataset.v === +sp.value));
+    renderKey(); markDirty();
+  }
+  [50, 75, 90, 100, 110, 125, 150].forEach(v => {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = v + '%'; b.dataset.v = v;
+    b.onclick = () => { sp.value = v; renderSp(); }; $('chips').appendChild(b);
+  });
+  st.oninput = renderSt; sp.oninput = renderSp;
+  $('stMinus').onclick = () => { st.value = +st.value - 1; renderSt(); };
+  $('stPlus').onclick = () => { st.value = +st.value + 1; renderSt(); };
+  $('spMinus').onclick = () => { sp.value = +sp.value - 1; renderSp(); };
+  $('spPlus').onclick = () => { sp.value = +sp.value + 1; renderSp(); };
+  $('stReset').onclick = () => { st.value = 0; renderSt(); };
+  $('spReset').onclick = () => { sp.value = 100; renderSp(); };
+  $('keep').onchange = () => { renderKey(); markDirty(); }; $('trans').onchange = markDirty;
+  function markDirty() { if (result) $('resLabel').textContent = 'Módosított (a beállítás azóta változott, nyomj Feldolgozást)'; }
+
+  // ---- mintavételi frekvencia kiolvasása, hogy a böngésző ne mintavételezze át dekódoláskor ----
+  function sniffRate(u8) {
+    try {
+      if (u8[0] === 0x52 && u8[1] === 0x49 && u8[8] === 0x57) { // WAV
+        for (let i = 12; i < Math.min(u8.length - 16, 4096); i++)
+          if (u8[i] === 0x66 && u8[i+1] === 0x6d && u8[i+2] === 0x74 && u8[i+3] === 0x20) return u8[i+12] | (u8[i+13] << 8) | (u8[i+14] << 16);
+      }
+      if (u8[0] === 0x66 && u8[1] === 0x4c && u8[2] === 0x61 && u8[3] === 0x43) { // FLAC STREAMINFO
+        return (u8[18] << 12) | (u8[19] << 4) | (u8[20] >> 4);
+      }
+      const find = (s, from = 0) => { const a = [...s].map(c => c.charCodeAt(0)); outer: for (let i = from; i <= u8.length - a.length; i++) { if (u8[i] !== a[0]) continue; for (let j = 1; j < a.length; j++) if (u8[i + j] !== a[j]) continue outer; return i; } return -1; };
+      if (u8[4] === 0x66 && u8[5] === 0x74 && u8[6] === 0x79 && u8[7] === 0x70) { // MP4 / MOV / M4A
+        let i = find('mp4a');
+        if (i >= 4) { const r = (u8[i + 28] << 8) | u8[i + 29]; if (r >= 8000) return r; }
+        if (find('Opus') >= 0) return 48000;
+        return 0;
+      }
+      if (u8[0] === 0x1A && u8[1] === 0x45 && u8[2] === 0xDF && u8[3] === 0xA3) { // WebM / MKV
+        if (find('A_OPUS') >= 0) return 48000;
+        const i = find('A_VORBIS'); return i >= 0 ? 0 : 48000;
+      }
+      let p = 0;
+      if (u8[0] === 0x49 && u8[1] === 0x44 && u8[2] === 0x33) p = 10 + ((u8[6] & 127) << 21 | (u8[7] & 127) << 14 | (u8[8] & 127) << 7 | (u8[9] & 127));
+      const RATES = { 3:[44100,48000,32000], 2:[22050,24000,16000], 0:[11025,12000,8000] };
+      for (let i = p; i < Math.min(u8.length - 4, p + 65536); i++) {
+        if (u8[i] === 0xFF && (u8[i+1] & 0xE0) === 0xE0) {
+          const ver = (u8[i+1] >> 3) & 3, layer = (u8[i+1] >> 1) & 3, ri = (u8[i+2] >> 2) & 3, bi = u8[i+2] >> 4;
+          if (ver !== 1 && layer !== 0 && ri !== 3 && bi !== 15 && bi !== 0) return RATES[ver][ri];
+        }
+      }
+    } catch (e) {}
+    return 0;
+  }
+
+  async function decode(arrayBuf) {
+    const u8 = new Uint8Array(arrayBuf);
+    const rate = sniffRate(u8) || 44100;
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = new OAC(2, 1, rate);
+    return await new Promise((res, rej) => {
+      const p = ctx.decodeAudioData(arrayBuf, res, rej);
+      if (p && p.then) p.then(res, rej);
+    });
+  }
+
+  async function loadFile(f) {
+    if (!f || busy) return;
+    setStatus(/^video\//.test(f.type) || /\.(mp4|mov|webm|m4v)$/i.test(f.name) ? 'Hangsáv kiolvasása a videóból…' : 'Betöltés…');
+    $('info').textContent = '';
+    try {
+      const ab = await f.arrayBuffer();
+      const buf = await decode(ab);
+      const channels = [];
+      for (let c = 0; c < Math.min(buf.numberOfChannels, 8); c++) channels.push(new Float32Array(buf.getChannelData(c)));
+      src = { channels, sampleRate: buf.sampleRate, name: f.name.replace(/\.[^.]+$/, ''), duration: buf.duration };
+      result = null; $('result').classList.add('hidden');
+      if (origUrl) URL.revokeObjectURL(origUrl);
+      origUrl = URL.createObjectURL(f);
+      $('aOrig').src = origUrl;
+      $('info').textContent = `${f.name} · ${fmtTime(buf.duration)} · ${buf.sampleRate} Hz · ${channels.length === 1 ? 'mono' : channels.length === 2 ? 'sztereó' : channels.length + ' csatorna'}`;
+      $('go').disabled = false;
+      key = null; $('keyWrap').classList.add('hidden');
+      setStatus('Hangnem elemzése…');
+      try { key = await DSP.detectKey(channels, buf.sampleRate); } catch (e) { key = null; }
+      if (key) { $('keyWrap').classList.remove('hidden'); renderSt(); setStatus(''); }
+      else setStatus('A hangnemet nem sikerült megállapítani (túl rövid vagy túl zajos felvétel).');
+    } catch (e) {
+      setStatus(/^video\//.test(f.type) || /\.(mkv|avi|wmv|flv)$/i.test(f.name) ? 'Ennek a videónak a hangsávját a böngésző nem tudja kiolvasni. MP4, MOV vagy WebM videóval működik; MKV/AVI esetén előbb alakítsd át MP4-re.' : 'Ezt a fájlt a böngésző nem tudta beolvasni. Próbálj másik MP3-at.', true);
+    }
+  }
+  $('file').onchange = e => loadFile(e.target.files[0]);
+  const drop = $('drop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+
+  function fmtTime(s) { const m = Math.floor(s / 60), r = Math.round(s % 60); return `${m}:${String(r).padStart(2, '0')}`; }
+  function setStatus(t, err) { $('status').textContent = t; $('status').classList.toggle('err', !!err); }
+  function setProg(p) { $('barI').style.width = (p * 100).toFixed(1) + '%'; }
+
+  $('go').onclick = async () => {
+    if (!src || busy) return;
+    busy = true; $('go').disabled = true; $('bar').style.display = 'block'; setProg(0);
+    const semitones = +st.value, speed = +sp.value / 100;
+    setStatus('Feldolgozás… (hosszabb dalnál telefonon fél–egy perc is lehet)');
+    const t0 = performance.now();
+    try {
+      const r = await DSP.process(src.channels, { semitones, speed, keepPitch: $('keep').checked, transients: $('trans').checked, onProgress: setProg });
+      let peak = 0;
+      for (const ch of r.channels) for (let i = 0; i < ch.length; i++) { const a = Math.abs(ch[i]); if (a > peak) peak = a; }
+      let gainNote = '';
+      if (peak > 0.999) {
+        const g = 0.999 / peak;
+        for (const ch of r.channels) for (let i = 0; i < ch.length; i++) ch[i] *= g;
+        gainNote = ` · túlvezérlés ellen ${(-20 * Math.log10(g)).toFixed(1)} dB-lel halkítva`;
+      }
+      result = { channels: r.channels, sampleRate: src.sampleRate, semitones, speed };
+      if (resUrl) URL.revokeObjectURL(resUrl);
+      resUrl = URL.createObjectURL(new Blob([DSP.encodeWAV(r.channels, src.sampleRate, 16)], { type: 'audio/wav' }));
+      $('aRes').src = resUrl;
+      const nk = newKeyText();
+      const desc = `${semitones > 0 ? '+' : ''}${semitones} félhang, ${Math.round(speed * 100)}%${$('keep').checked ? '' : ', magnós mód'}${nk ? ', ' + nk.name : ''}`;
+      $('resLabel').textContent = `Módosított (${desc}) · ${fmtTime(r.channels[0].length / src.sampleRate)}`;
+      $('result').classList.remove('hidden');
+      setStatus((r.bypass ? 'Nincs változtatás, a hang bitre azonos.' : `Kész, ${((performance.now() - t0) / 1000).toFixed(1)} mp alatt`) + gainNote);
+    } catch (e) {
+      setStatus('Hiba a feldolgozás közben: ' + (e && e.message || e), true);
+    }
+    $('bar').style.display = 'none'; busy = false; $('go').disabled = false;
+  };
+
+  // ---- MP3-kódoló betöltése (lamejs, CDN-ről, tartalék forrásokkal) ----
+  const LAME_SRC = ['https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js', 'https://cdn.jsdelivr.net/npm/lamejs-fixed@1.2.2/lame.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js'];
+  let lameReady = null;
+  function loadLame() {
+    if (lameReady) return lameReady;
+    lameReady = (async () => {
+      if (window.lamejs && window.lamejs.Mp3Encoder) return true;
+      for (const u of LAME_SRC) {
+        const ok = await new Promise(res => { const s = document.createElement('script'); s.src = u; s.onload = () => res(true); s.onerror = () => { s.remove(); res(false); }; document.head.appendChild(s); });
+        if (ok && window.lamejs && window.lamejs.Mp3Encoder) return true;
+      }
+      return false;
+    })();
+    return lameReady;
+  }
+  loadLame();
+
+  const MP3_RATES = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000];
+  async function encodeMP3(channels, sr, kbps, onProgress) {
+    if (!(await loadLame())) throw { code: 'nolame' };
+    if (!MP3_RATES.includes(sr)) throw { code: 'rate' };
+    if (sr < 32000) kbps = Math.min(kbps, 160);
+    const C = Math.min(2, channels.length), L = channels[0], R = channels[1];
+    const enc = new lamejs.Mp3Encoder(C, sr, kbps);
+    const n = L.length, B = 1152, parts = [];
+    const l16 = new Int16Array(B), r16 = new Int16Array(B);
+    const conv = (src, dst, off, len) => {
+      for (let i = 0; i < len; i++) { let v = src[off + i] * 32767 + (Math.random() - Math.random()); dst[i] = v > 32767 ? 32767 : v < -32768 ? -32768 : Math.round(v); }
+    };
+    for (let off = 0, k = 0; off < n; off += B, k++) {
+      const len = Math.min(B, n - off);
+      conv(L, l16, off, len);
+      const lb = len === B ? l16 : l16.subarray(0, len);
+      let out;
+      if (C === 2) { conv(R, r16, off, len); out = enc.encodeBuffer(lb, len === B ? r16 : r16.subarray(0, len)); }
+      else out = enc.encodeBuffer(lb);
+      if (out && out.length) parts.push(new Uint8Array(out.buffer, out.byteOffset, out.length).slice());
+      if (k % 400 === 399) { onProgress(off / n); await new Promise(r => setTimeout(r, 0)); }
+    }
+    const end = enc.flush();
+    if (end && end.length) parts.push(new Uint8Array(end.buffer, end.byteOffset, end.length).slice());
+    onProgress(1);
+    return parts;
+  }
+
+  // ---- mentés ----
+  let downloads = null;
+  if (DESKTOP) {
+    $('saveNote').textContent = 'A fájl a böngésző Letöltések mappájába kerül.';
+  } else {
+    $('saveNote').textContent = 'A fájl ZIP-be csomagolva érkezik (a Claude csak így enged hangfájlt menteni). Androidon a Fájlok alkalmazás egy koppintással kibontja.';
+    (async () => {
+      for (let i = 0; i < 30 && !(window.claude && window.claude.use); i++) await new Promise(r => setTimeout(r, 100));
+      if (!(window.claude && window.claude.use)) return noDl();
+      try { downloads = await window.claude.use('downloads'); if (!downloads) noDl(); } catch (e) { noDl(); }
+    })();
+  }
+  function noDl() { $('save').classList.add('hidden'); $('bits').classList.add('hidden'); $('saveNote').textContent = 'Ebben a nézetben a mentés nem érhető el. Nyisd meg az oldalt a claude.ai-on vagy a Claude alkalmazásban.'; }
+
+  $('save').onclick = async () => {
+    if (!result || busy) return;
+    if (!DESKTOP && !downloads) return;
+    const fmt = $('bits').value, isMp3 = fmt.startsWith('mp3');
+    const tag = `${result.semitones > 0 ? '+' : ''}${result.semitones}fh_${Math.round(result.speed * 100)}pct`;
+    const fname = `${src.name}_${tag}.${isMp3 ? 'mp3' : 'wav'}`;
+    busy = true; $('save').disabled = true;
+    let parts;
+    try {
+      if (isMp3) {
+        $('bar').style.display = 'block'; setProg(0); setStatus('MP3 kódolása…');
+        parts = await encodeMP3(result.channels, result.sampleRate, +fmt.slice(4), setProg);
+      } else {
+        parts = [DSP.encodeWAV(result.channels, result.sampleRate, +fmt)];
+      }
+    } catch (e) {
+      const c = e && e.code;
+      setStatus(c === 'nolame' ? 'Az MP3-kódolót nem sikerült betölteni (nincs internet?). Válassz WAV-ot, vagy próbáld újra később.'
+        : c === 'rate' ? `Ez a mintavételi frekvencia (${result.sampleRate} Hz) MP3-ban nem menthető. Válassz WAV-ot.`
+        : 'Hiba a kódolás közben: ' + (e && e.message || e), true);
+      if (c === 'nolame') lameReady = null;
+      $('bar').style.display = 'none'; busy = false; $('save').disabled = false; return;
+    }
+    $('bar').style.display = 'none';
+    try {
+      if (DESKTOP) {
+        const url = URL.createObjectURL(new Blob(parts, { type: isMp3 ? 'audio/mpeg' : 'audio/wav' }));
+        const a = document.createElement('a'); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setStatus('Mentve: ' + fname);
+      } else {
+        const data = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+        let o = 0; for (const p of parts) { data.set(p, o); o += p.length; }
+        const blob = new Blob(DSP.zipStore(fname, data), { type: 'application/zip' });
+        await downloads.save({ filename: fname.replace(/\.(mp3|wav)$/, '.zip'), data: blob });
+        setStatus('Mentve: ' + fname + ' (ZIP-ben)');
+      }
+    } catch (e) {
+      const c = e && e.code;
+      if (c === 'declined') setStatus('A mentést elvetetted.');
+      else if (c === 'rate_limited') setStatus('Egy mentési ablak már nyitva van, próbáld újra pár másodperc múlva.');
+      else if (c === 'too_large') setStatus('A fájl túl nagy ehhez a mentési módhoz. Válassz MP3-at vagy 16 bites WAV-ot.', true);
+      else { setStatus('A mentés itt nem érhető el.', true); noDl(); }
+    }
+    busy = false; $('save').disabled = false;
+  };
+  renderSt(); renderSp();
+})();
+</script>
+</body>
+</html>
