@@ -7,6 +7,7 @@
 <style>
   :root { --bg:#0f1115; --card:#181b22; --line:#2a2f3a; --txt:#e8eaef; --mut:#9aa1ae; --acc:#4fb3a9; --acc2:#e0a84a; --err:#e06a6a; }
   * { box-sizing:border-box; }
+  html, body { overflow-x:hidden; }
   body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
   main { max-width:620px; margin:0 auto; padding:20px 16px 48px; }
   h1 { font-size:22px; margin:4px 0 2px; letter-spacing:.2px; }
@@ -36,12 +37,12 @@
   .go:disabled { opacity:.4; cursor:default; }
   .bar { height:8px; background:#20242d; border-radius:99px; overflow:hidden; margin-top:12px; display:none; }
   .bar i { display:block; height:100%; width:0; background:var(--acc); transition:width .1s; }
-  .status { font-size:14px; color:var(--mut); margin-top:8px; min-height:20px; }
+  .status { overflow-wrap:anywhere; font-size:14px; color:var(--mut); margin-top:8px; min-height:20px; }
   .status.err { color:var(--err); }
   audio { width:100%; margin:6px 0 12px; }
-  .pl { font-size:14px; color:var(--mut); }
-  select { background:#20242d; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:15px; flex:1; }
-  .save { padding:11px 16px; border-radius:10px; border:1px solid var(--acc); background:transparent; color:var(--acc); font-size:15px; font-weight:600; cursor:pointer; }
+  .pl { font-size:14px; color:var(--mut); overflow-wrap:anywhere; }
+  select { min-width:0; width:100%; text-overflow:ellipsis; background:#20242d; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:15px; flex:1; }
+  .save { flex:none; padding:11px 16px; border-radius:10px; border:1px solid var(--acc); background:transparent; color:var(--acc); font-size:15px; font-weight:600; cursor:pointer; }
   .note { font-size:13px; color:var(--mut); margin-top:10px; }
   .hidden { display:none !important; }
   .keybox { margin-top:12px; padding:12px; border-radius:10px; background:#20242d; display:flex; gap:14px; align-items:center; }
@@ -108,12 +109,12 @@
     <audio id="aRes" controls preload="metadata"></audio>
     <div class="row">
       <select id="bits">
-        <option value="mp3-320" selected>MP3 320 kbps (legjobb)</option>
+        <option value="mp3-320" selected>MP3 320 kbps</option>
         <option value="mp3-256">MP3 256 kbps</option>
-        <option value="mp3-192">MP3 192 kbps (kisebb fájl)</option>
-        <option value="16">WAV 16 bit (veszteségmentes, CD)</option>
-        <option value="24">WAV 24 bit (veszteségmentes, stúdió)</option>
-        <option value="32">WAV 32 bit lebegőpontos</option>
+        <option value="mp3-192">MP3 192 kbps</option>
+        <option value="16">WAV 16 bit</option>
+        <option value="24">WAV 24 bit</option>
+        <option value="32">WAV 32 bit float</option>
       </select>
       <button class="save" id="save">Mentés</button>
     </div>
