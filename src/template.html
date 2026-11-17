@@ -54,6 +54,9 @@
   select { min-width:0; width:100%; text-overflow:ellipsis; background:#20242d; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:15px; flex:1; }
   .save { flex:none; padding:11px 16px; border-radius:10px; border:1px solid var(--acc); background:transparent; color:var(--acc); font-size:15px; font-weight:600; cursor:pointer; }
   .note { font-size:13px; color:var(--mut); margin-top:10px; }
+  .install { width:100%; margin:0 0 14px; padding:12px; border-radius:12px; border:1px solid var(--acc); background:rgba(79,179,169,.12); color:var(--acc); font-size:16px; font-weight:600; cursor:pointer; }
+  .installhelp { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:14px; color:var(--mut); margin:-6px 0 14px; }
+  .installhelp b { color:var(--txt); }
   .hidden { display:none !important; }
   .keybox { margin-top:12px; padding:12px; border-radius:10px; background:#20242d; display:flex; gap:14px; align-items:center; }
   .keybox .k { font-size:26px; font-weight:650; white-space:nowrap; }
@@ -78,6 +81,10 @@
 <main>
   <h1>MP3 Hangmagasság és Sebesség</h1>
   <div class="sub">Félhangonkénti hangolás és külön sebességállítás, minden a böngészőben fut, semmit nem tölt fel.</div>
+<!--PWA-->
+  <button id="installBtn" class="install hidden">⤓ Telepítés alkalmazásként</button>
+  <div id="installHelp" class="installhelp hidden"></div>
+<!--/PWA-->
 
   <div class="card">
     <label class="drop" id="drop">
@@ -495,6 +502,31 @@
 <!--PWA-->
 <script>
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./sw.js').catch(() => {});
+(() => {
+  const btn = document.getElementById('installBtn'), help = document.getElementById('installHelp');
+  const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (standalone() || !/^https?:$/.test(location.protocol)) return;
+  const ua = navigator.userAgent;
+  const ios = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const android = /android/i.test(ua), samsung = /samsungbrowser/i.test(ua);
+  let deferred = null;
+  const howTo = () => ios
+    ? 'Safariban: koppints a <b>Megosztás</b> gombra (négyzet felfelé nyíllal), majd <b>„Főképernyőhöz adás”</b>.'
+    : samsung ? 'Samsung Internetben: lent a <b>☰ menü</b> → <b>„Oldal hozzáadása”</b> → <b>„Kezdőképernyő”</b>.'
+    : android ? 'Chrome-ban: jobb fent a <b>⋮ menü</b> → <b>„Alkalmazás telepítése”</b> vagy <b>„Hozzáadás a kezdőképernyőhöz”</b> → <b>Telepítés</b>.'
+    : 'Chrome-ban vagy Edge-ben: a címsor jobb végén a <b>telepítés ikon</b> (monitor lefelé nyíllal), vagy a ⋮ menü → <b>„Telepítés…”</b>.';
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; btn.textContent = '⤓ Telepítés alkalmazásként'; btn.classList.remove('hidden'); help.classList.add('hidden'); });
+  window.addEventListener('appinstalled', () => { btn.classList.add('hidden'); help.innerHTML = '<b>Telepítve.</b> Mostantól a kezdőképernyőről indíthatod.'; help.classList.remove('hidden'); });
+  btn.onclick = async () => {
+    if (deferred) {
+      deferred.prompt();
+      try { const r = await deferred.userChoice; if (r && r.outcome === 'accepted') btn.classList.add('hidden'); } catch (e) {}
+      deferred = null;
+    } else { help.innerHTML = howTo(); help.classList.toggle('hidden'); }
+  };
+  // Ha a böngésző nem ad saját telepítési ablakot (iPhone, vagy még nem kínálta fel), útmutatót mutatunk
+  setTimeout(() => { if (!deferred && !standalone()) { btn.textContent = 'ⓘ Hogyan telepítsem alkalmazásként?'; btn.classList.remove('hidden'); } }, ios ? 0 : 2500);
+})();
 </script>
 <!--/PWA-->
 </body>

@@ -1,7 +1,7 @@
 // Service worker: offline indulás. Saját fájlok: network-first (a frissítés azonnal látszik),
 // hálózati hiba esetén cache. A CDN-ről betöltött lamejs-t első sikeres letöltés után eltesszük,
 // hogy offline is menjen az MP3-mentés. Új kiadásnál növeld a verziót.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'hang-' + VERSION;
 const RUNTIME = 'hang-runtime-' + VERSION;
 const ASSETS = [
