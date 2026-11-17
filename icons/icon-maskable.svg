@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- MP3 Hangmagasság és Sebesség – maskable változat (a rajz a középső biztonsági körön belül): hanghullám + fel/le nyíl -->
+  <rect width="512" height="512" fill="#0f1115"/>
+  <g id="art" transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <g stroke="#4fb3a9" stroke-width="26" stroke-linecap="round" fill="none">
+      <line x1="104" y1="236" x2="104" y2="276"/>
+      <line x1="146" y1="196" x2="146" y2="316"/>
+      <line x1="188" y1="146" x2="188" y2="366"/>
+      <line x1="230" y1="186" x2="230" y2="326"/>
+      <line x1="272" y1="126" x2="272" y2="386"/>
+      <line x1="314" y1="206" x2="314" y2="306"/>
+    </g>
+    <g fill="#e0a84a">
+      <path d="M392 120 L446 196 L338 196 Z" stroke="#e0a84a" stroke-width="14" stroke-linejoin="round"/>
+      <path d="M392 392 L446 316 L338 316 Z" stroke="#e0a84a" stroke-width="14" stroke-linejoin="round"/>
+      <rect x="380" y="236" width="24" height="40" rx="12"/>
+    </g>
+  </g>
+</svg>
