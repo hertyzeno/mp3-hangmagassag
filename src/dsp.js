@@ -324,6 +324,80 @@ const DSP = (() => {
     return { pc: scores[0].pc, mode: scores[0].mode, r: scores[0].r, second: scores[1], margin: scores[0].r - scores[1].r, tuningCents: Math.round(tuning * 100), chroma: Array.from(chroma) };
   }
 
-  return { timeStretch, resample, process, encodeWAV, zipStore, crc32, detectKey };
+  // ---- Kiesések (rövid, hirtelen elnémulások) keresése ----
+  async function detectDropouts(channels, sr) {
+    const C = channels.length, len = channels[0].length;
+    const w = Math.round(sr / 100);                // 10 ms
+    const n = Math.floor(len / w);
+    const e = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let s = 0;
+      for (let j = i * w; j < (i + 1) * w; j++) { let v = 0; for (let c = 0; c < C; c++) v += channels[c][j]; v /= C; s += v * v; }
+      e[i] = Math.sqrt(s / w);
+      if ((i & 8191) === 8191) await yieldNow();
+    }
+    const flagged = new Uint8Array(n);
+    const skip = 20; // eleje/vége 0,2 s kihagyva
+    for (let i = skip; i < n - skip; i++) {
+      let pre = 0, post = 0;
+      for (let k = 1; k <= 5; k++) { pre += e[i - k - 2] || 0; post += e[i + k + 2] || 0; }
+      pre /= 5; post /= 5;
+      if (Math.min(pre, post) > 0.012 && e[i] < 0.2 * Math.min(pre, post)) flagged[i] = 1;
+    }
+    // összefüggő szakaszok → események, pontos határ 2 ms-os felbontással
+    const events = [];
+    const rms = (a, b) => { let s = 0, m = 0; for (let j = Math.max(0, a); j < Math.min(len, b); j++) { let v = 0; for (let c = 0; c < C; c++) v += channels[c][j]; v /= C; s += v * v; m++; } return m ? Math.sqrt(s / m) : 0; };
+    for (let i = skip; i < n - skip; i++) {
+      if (!flagged[i]) continue;
+      let j = i; while (j + 1 < n && flagged[j + 1]) j++;
+      const preLvl = rms((i - 8) * w, (i - 3) * w), postLvl = rms((j + 4) * w, (j + 9) * w);
+      const s2 = Math.round(sr / 500); // 2 ms
+      let g0 = i * w; while (g0 > (i - 4) * w && rms(g0 - s2, g0) < 0.5 * preLvl) g0 -= s2;
+      let g1 = (j + 1) * w; while (g1 < (j + 5) * w && rms(g1, g1 + s2) < 0.5 * postLvl) g1 += s2;
+      g0 -= 2 * s2;
+      const dur = (g1 - g0) / sr;
+      if (dur >= 0.008 && dur <= 0.15) events.push({ start: g0, end: g1, time: g0 / sr, ms: Math.round(dur * 1000) });
+      i = j;
+    }
+    return events;
+  }
+
+  // ---- Kiesés pótlása a közvetlenül előtte szóló hang folytatásával ----
+  function repairDropout(channels, sr, g0, g1) {
+    const C = channels.length, G = g1 - g0;
+    const L = Math.round(0.025 * sr), F = Math.round(0.005 * sr);
+    const kMax = Math.min(Math.round(0.4 * sr), g0 - L - F - 1);
+    let best = -2, bestK = -1;
+    let refE = 0;
+    for (let c = 0; c < C; c++) for (let j = 0; j < L; j++) { const v = channels[c][g0 - L + j]; refE += v * v; }
+    for (let k = G + F; k <= kMax; k++) {
+      let num = 0, ce = 0;
+      for (let c = 0; c < C; c++) {
+        const ch = channels[c];
+        for (let j = 0; j < L; j++) { const a = ch[g0 - k - L + j], b = ch[g0 - L + j]; num += a * b; ce += a * a; }
+      }
+      const r = num / (Math.sqrt(ce * refE) + 1e-12);
+      if (r > best) { best = r; bestK = k; }
+    }
+    if (bestK < 0) return null;
+    const src = g0 - bestK;
+    let se = 0;
+    for (let c = 0; c < C; c++) for (let j = 0; j < L; j++) { const v = channels[c][src - L + j]; se += v * v; }
+    const gain = Math.sqrt(refE / Math.max(se, 1e-18));
+    for (let c = 0; c < C; c++) {
+      const ch = channels[c];
+      const patch = ch.slice(src - F, src + G + F);
+      for (let j = 0; j < G + 2 * F; j++) {
+        let wv = 1;
+        if (j < F) wv = Math.sin((j / (F - 1)) * Math.PI / 2) ** 2;
+        else if (j >= G + F) wv = Math.sin(((G + 2 * F - 1 - j) / (F - 1)) * Math.PI / 2) ** 2;
+        const idx = g0 - F + j;
+        ch[idx] = ch[idx] * (1 - wv) + patch[j] * gain * wv;
+      }
+    }
+    return { similarity: best, source: src / sr, gain };
+  }
+
+  return { timeStretch, resample, process, encodeWAV, zipStore, crc32, detectKey, detectDropouts, repairDropout };
 })();
 if (typeof module !== 'undefined') module.exports = DSP;

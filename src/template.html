@@ -49,6 +49,16 @@
   .keybox .k { font-size:26px; font-weight:650; white-space:nowrap; }
   .keybox .arrow { color:var(--mut); font-size:20px; }
   .keybox .k.new { color:var(--acc2); }
+  .drops { margin-top:12px; padding:12px; border-radius:10px; background:#2a2219; border:1px solid #5a4325; }
+  .drops .dt { font-weight:600; color:var(--acc2); margin-bottom:6px; }
+  .ditem { display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid #3a2f22; }
+  .ditem:first-of-type { border-top:0; }
+  .ditem input { width:20px; height:20px; accent-color:var(--acc2); flex:none; }
+  .ditem .dtime { flex:1; font-variant-numeric:tabular-nums; }
+  .ditem .dtime.ok { color:var(--acc); }
+  .mini { border:1px solid var(--line); background:#20242d; color:var(--txt); border-radius:8px; padding:7px 10px; font-size:14px; cursor:pointer; flex:none; }
+  .drops .save { width:100%; margin-top:8px; border-color:var(--acc2); color:var(--acc2); }
+  .drops .dn { font-size:13px; color:var(--mut); margin-top:8px; }
   #kMeta { font-size:13px; color:var(--mut); margin-top:6px; }
   details { color:var(--mut); font-size:14px; }
   details summary { cursor:pointer; color:var(--txt); }
@@ -70,6 +80,13 @@
       <div class="keybox"><div><div class="pl">Eredeti</div><div class="k" id="kOrig">–</div></div><div class="arrow">→</div><div><div class="pl">Módosított</div><div class="k new" id="kNew">–</div></div></div>
       <div class="meta" id="kMeta"></div>
     </div>
+    <div id="dropWrap" class="drops hidden">
+      <div class="dt" id="dTitle"></div>
+      <div id="dList"></div>
+      <button class="save" id="dFix">Kijelöltek javítása</button>
+      <div class="dn" id="dNote">Rövid, hirtelen elnémulások a felvételben. Előbb hallgasd meg: ha valamelyik szándékos zenei szünet, vedd ki a pipát.</div>
+    </div>
+    <audio id="aPrev" class="hidden"></audio>
   </div>
 
   <div class="card">
@@ -265,6 +282,7 @@
       try { key = await DSP.detectKey(channels, buf.sampleRate); } catch (e) { key = null; }
       if (key) { $('keyWrap').classList.remove('hidden'); renderSt(); setStatus(''); }
       else setStatus('A hangnemet nem sikerült megállapítani (túl rövid vagy túl zajos felvétel).');
+      await findDrops();
     } catch (e) {
       setStatus(/^video\//.test(f.type) || /\.(mkv|avi|wmv|flv)$/i.test(f.name) ? 'Ennek a videónak a hangsávját a böngésző nem tudja kiolvasni. MP4, MOV vagy WebM videóval működik; MKV/AVI esetén előbb alakítsd át MP4-re.' : 'Ezt a fájlt a böngésző nem tudta beolvasni. Próbálj másik MP3-at.', true);
     }
@@ -274,6 +292,52 @@
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('over'));
   drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+
+  // ---- kiesések ----
+  let drops = [];
+  const fmtPrec = s => { const m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r.toFixed(2).padStart(5, '0').replace('.', ',')}`; };
+  async function findDrops() {
+    drops = []; $('dropWrap').classList.add('hidden');
+    try { drops = await DSP.detectDropouts(src.channels, src.sampleRate); } catch (e) { drops = []; }
+    if (!drops.length) return;
+    $('dTitle').textContent = drops.length === 1 ? '1 kiesést találtam a felvételben' : `${drops.length} kiesést találtam a felvételben`;
+    const list = $('dList'); list.innerHTML = '';
+    drops.forEach((d, i) => {
+      const row = document.createElement('div'); row.className = 'ditem';
+      row.innerHTML = `<input type="checkbox" checked id="dc${i}"><label class="dtime" for="dc${i}" id="dl${i}">${fmtPrec(d.time)} · ${d.ms} ms</label><button class="mini" id="dp${i}">▶ Meghallgatás</button>`;
+      list.appendChild(row);
+      row.querySelector('button').onclick = () => preview(d.time);
+    });
+    $('dFix').disabled = false; $('dFix').classList.remove('hidden');
+    $('dropWrap').classList.remove('hidden');
+  }
+  let prevTimer = null;
+  function preview(t) {
+    const a = $('aPrev');
+    if (!a.src) a.src = origUrl;
+    const go = () => { a.currentTime = Math.max(0, t - 2); a.play().catch(() => {}); clearTimeout(prevTimer); prevTimer = setTimeout(() => a.pause(), 4000); };
+    if (a.readyState >= 1) go(); else { a.onloadedmetadata = () => { a.onloadedmetadata = null; go(); }; a.load(); }
+  }
+  $('dFix').onclick = () => {
+    if (!src || busy) return;
+    let n = 0;
+    drops.forEach((d, i) => {
+      if (d.fixed || !$('dc' + i).checked) return;
+      if (DSP.repairDropout(src.channels, src.sampleRate, d.start, d.end)) {
+        d.fixed = true; n++;
+        $('dl' + i).textContent = `${fmtPrec(d.time)} · javítva ✓`; $('dl' + i).classList.add('ok'); $('dc' + i).disabled = true;
+      }
+    });
+    if (!n) return;
+    // a javított eredeti legyen hallható
+    if (origUrl) URL.revokeObjectURL(origUrl);
+    origUrl = URL.createObjectURL(new Blob([DSP.encodeWAV(src.channels, src.sampleRate, 16)], { type: 'audio/wav' }));
+    $('aOrig').src = origUrl; $('aPrev').src = origUrl;
+    if (drops.every(d => d.fixed)) { $('dFix').classList.add('hidden'); }
+    $('dNote').textContent = `${n} kiesés javítva: a rés helyére a közvetlenül előtte szóló hang folytatása került. A „Meghallgatás” már a javított változatot játssza. A javítás minden további feldolgozásba és mentésbe bekerül.`;
+    if (result) $('resLabel').textContent = 'Módosított (a felvételt azóta javítottad, nyomj Feldolgozást)';
+    setStatus('');
+  };
 
   function fmtTime(s) { const m = Math.floor(s / 60), r = Math.round(s % 60); return `${m}:${String(r).padStart(2, '0')}`; }
   function setStatus(t, err) { $('status').textContent = t; $('status').classList.toggle('err', !!err); }
